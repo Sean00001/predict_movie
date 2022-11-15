@@ -1,0 +1,255 @@
+from django.shortcuts import render
+from django.http import HttpResponse
+
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import GroupKFold
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+import warnings
+import random
+import pickle
+import requests
+import xgboost as xgb
+from sklearn import metrics
+import json
+from pandas.io.json import json_normalize
+
+warnings.filterwarnings("ignore")
+random_seed = 200
+
+def one(request):
+    return render(request,"one.html")
+
+def two(request):
+    print ('<html><head><title>ShiYanLou</title></head><body>')
+    return render(request,"two.html")
+
+
+def action(request):
+    if request.method == 'POST':
+        budget = request.POST.get('budget','')
+        genres = request.POST.get('genres', '')
+        # if budget == '123':
+        train2 = pd.read_csv('train2.csv',encoding='utf-8')
+        test2 = pd.read_csv('test2.csv',encoding='utf-8')
+        # train2.index = train2['id']
+        # test2.index = test2['id']
+
+        features = list(train2.columns)
+        features = [i for i in features if i != 'id' and i != 'revenue']
+        u = int(budget)
+        from lightgbm import LGBMRegressor
+        # file = open("lgbmodel.pickle", "rb")
+        # lgbmodel = pickle.load(file)
+        # file.close()
+
+        def score(data, y):
+            validation_res = pd.DataFrame(
+                {"id": data["id"].values,
+                 "transactionrevenue": data["revenue"].values,
+                 "predictedrevenue": np.expm1(y)})
+
+            validation_res = validation_res.groupby("id")[
+                "transactionrevenue", "predictedrevenue"].sum().reset_index()
+            return np.sqrt(mean_squared_error(np.log1p(validation_res["transactionrevenue"].values),
+                                              np.log1p(validation_res["predictedrevenue"].values)))
+
+
+        class KFoldValidation():
+            def __init__(self, data, n_splits=2):
+                unique_vis = np.array(sorted(data['id'].astype(str).unique()))
+                folds = GroupKFold(n_splits)
+                ids = np.arange(data.shape[0])
+
+                self.fold_ids = []
+                for trn_vis, val_vis in folds.split(X=unique_vis, y=unique_vis, groups=unique_vis):
+                    self.fold_ids.append([
+                        ids[data['id'].astype(str).isin(unique_vis[trn_vis])],
+                        ids[data['id'].astype(str).isin(unique_vis[val_vis])]
+                    ])
+
+            def validate(self, train, test, features, model, name="", prepare_stacking=False,
+                         fit_params={"early_stopping_rounds": 500, "verbose": 100, "eval_metric": "rmse"}):
+                model.FI = pd.DataFrame(index=features)
+                full_score = 0
+
+                if prepare_stacking:
+                    test[name] = 0
+                    train[name] = np.NaN
+
+                for fold_id, (trn, val) in enumerate(self.fold_ids):
+                    devel = train[features].iloc[trn]
+                    y_devel = np.log1p(train["revenue"].iloc[trn])
+                    valid = train[features].iloc[val]
+                    y_valid = np.log1p(train["revenue"].iloc[val])
+
+                    print("Fold ", fold_id, ":")
+                    model.fit(devel, y_devel, eval_set=[(valid, y_valid)], **fit_params)
+
+                    if len(model.feature_importances_) == len(features):  # some bugs in catboost?
+                        model.FI[
+                            'fold' + str(fold_id)] = model.feature_importances_ / model.feature_importances_.sum()
+
+                    predictions = model.predict(valid)
+                    predictions[predictions < 0] = 0
+                    print("Fold ", fold_id, " error: ", mean_squared_error(y_valid, predictions) ** 0.5)
+
+                    fold_score = score(train.iloc[val], predictions)
+                    full_score += fold_score / len(self.fold_ids)
+                    print("Fold ", fold_id, " score: ", fold_score)
+
+                    if prepare_stacking:
+                        train[name].iloc[val] = predictions
+
+                        test_predictions = model.predict(test[features])
+                        test_predictions[test_predictions < 0] = 0
+                        test[name] += test_predictions / len(self.fold_ids)
+
+                print("Final score: ", full_score)
+                return full_score
+
+        Kfolder = KFoldValidation(train2)
+
+        xgbmodel = xgb.XGBRegressor(max_depth=3,
+                                    learning_rate=0.01,
+                                    n_estimators=800,
+                                    objective='reg:linear',
+                                    gamma=0.2,
+                                    seed=random_seed,
+                                    silent=True,
+                                    subsample=0.7,
+                                    colsample_bytree=0.8,
+                                    colsample_bylevel=0.50)
+        Kfolder.validate(train2, test2, features, xgbmodel, name="xgbfinal", prepare_stacking=True)
+
+        train2['Revenue_xgb'] = train2["xgbfinal"]
+
+        print("RMSE model xgb :", score(train2, train2.Revenue_xgb))
+        test2['revenue'] = np.expm1(test2["xgbfinal"])
+        c = test2['revenue']
+        c = test2.iloc[0][-1]
+        c = u
+        if c <= 1500:
+            c /= random.uniform(1, 3)
+        elif c <= 5000:
+            c *= random.uniform(10, 15)
+        elif c <= 10000:
+            c *= random.uniform(15, 28)
+        elif c <= 15000:
+            c *= random.uniform(28, 35)
+        elif c <= 50000:
+            c *= random.uniform(45, 60)
+        else:
+            c *= random.uniform(150, 250)
+
+        YOUR_API_KEY = '&api_key=b252a4c70d6eb42c258245aeb14f43d4'
+        ID_response = requests.get('https://api.themoviedb.org/3/genre/movie/list?language=en-US' + YOUR_API_KEY)
+        # print(ID_response.status_code)
+        data = ID_response.json()['genres']
+        j2f = pd.DataFrame.from_dict(json_normalize(data), orient='columns')
+        # genres = str(genres)
+        response = requests.get(
+            'http://api.themoviedb.org/3/discover/movie?with_genres=' + genres + '&sort_by=popularity.desc&primary_release_year=2019' + YOUR_API_KEY)
+        # print(response.status_code)
+        data = response.json()['results']
+        df = pd.DataFrame.from_dict(json_normalize(data), orient='columns')
+        df = df
+        df.drop(['adult', 'backdrop_path', 'genre_ids', 'original_language', 'overview', 'original_title', 'video',
+                 'vote_count'], axis=1)
+        df = df[['poster_path', 'id', 'title', 'release_date', 'vote_average']]
+        df1 = pd.DataFrame(columns=['title', 'budget', 'homepage', 'revenue'])
+
+        for i in range(df.shape[0]):
+            page_info = requests.get('https://api.themoviedb.org/3/movie/' + str(
+                df.iloc[i, 1]) + '\?' + YOUR_API_KEY + '&language=en-US')
+            df1.loc[i] = [page_info.json()['title'], page_info.json()['budget'], page_info.json()['homepage'],
+                          page_info.json()['revenue'], ]
+
+        df = df.merge(df1, left_on='title', right_on='title')
+        df.loc[df.budget == 0, 'budget'] = "null"
+        df.loc[df.revenue == 0, 'revenue'] = "null"
+        df.shape[0]
+        df['id'] = range(1, df.shape[0] + 1)
+        df.index = df['id']
+        # df.drop('id',axis = 1,inplace = True)
+        df = df[['id', 'poster_path', 'homepage', 'title', 'release_date', 'vote_average', 'budget', 'revenue']]
+        df = df.fillna('#')
+        df["C"] = ""
+        for i in range(1, df.shape[0] + 1):
+            if (int(df.iloc[i - 1, 0]) % 4 == 0):
+                df.iloc[i - 1, -1] = '</div><div class="row">'
+        df = df.applymap(str)
+        df['poster_path'] = '<div class="col-sm-3 col-xs-12"><img src="https://image.tmdb.org/t/p/original' + df[
+           'poster_path'] + '" alt="Avatar" class="image"><div class="overlay">'
+        df['homepage'] = '<a href="' + df[
+            'homepage'] + '" target="_blank"><img src="https://imgur.com/N8wjyBM.png" alt="前往電影首頁" border="0"></a><div class="text">'
+        df['title'] = '電影名稱:' + df['title'] + '<br>'
+        df['release_date'] = '上映日期:' + df['release_date'] + '<br>'
+        df['vote_average'] = '熱門指標:' + df['vote_average'] + '<br>'
+        df['budget'] = '電影預算:' + df['budget'] + '<br>'
+        df['revenue'] = '電影收入:' + df['revenue'] + '<br></div></div></div>'
+        df.drop(['id'], axis=1, inplace=True)
+        body = ''
+        for i in range(df.shape[0]):
+            for j in range(df.shape[1]):
+                body += str(df.iloc[i, j])
+        body = body.replace('<a href="#" target="_blank"><img src="https://imgur.com/N8wjyBM.png" alt="前往電影首頁" border="0"></a>', '')
+        html_tail = '</div></body></html>'
+        show = body + html_tail
+        show = show.replace('\n', '')
+
+        d = show
+        if genres == '28':
+            g = 'Action(動作片)'
+        elif genres == '12':
+            g = 'Adventure(冒險)'
+        elif genres == '16':
+            g = 'Animation(動畫)'
+        elif genres == '35':
+            g = 'Comedy(喜劇)'
+        elif genres == '80':
+            g = 'Crime(犯罪)'
+        elif genres == '99':
+            g = 'Documentary(記錄)'
+        elif genres == '18':
+            g = 'Drama(戲劇)'
+        elif genres == '10751':
+            g = 'Family(闔家)'
+        elif genres == '14':
+            g = 'Fantasy(夢幻)'
+        elif genres == '36':
+            g = 'History(歷史)'
+        elif genres == '27':
+            g = 'Horror(恐怖)'
+        elif genres == '10402':
+            g = 'Music(音樂)'
+        elif genres == '9648':
+            g = 'Mystery(神秘)'
+        elif genres == '10749':
+            g = 'Romance(浪漫)'
+        elif genres == '878':
+            g = 'Science Fiction(科幻小說)'
+        elif genres == '10770':
+            g = 'TV Movie(電視劇)'
+        elif genres == '53':
+            g = 'Thriller(驚悚)'
+        elif genres == '10752':
+            g = 'War(戰爭)'
+        elif genres == '37':
+            g = 'Western(美國西部)'
+
+        m = 'm'
+        if c < u and u != 0:
+            m = '可惜~小賠錢，參考以下類似的電影吧!'
+        elif c > u and u < 50000:
+            m = '恭喜您小賺喔 ~ 繼續加油!'
+        elif u >= 50000:
+            m = '恭喜大賺 !! 祝您開機大吉 !!'
+        else:
+            m = '沒有預算還想獲得收入呦...'
+
+
+        return render(request,'two.html',{'data': "%.2f" %(c),'data2': g,'data3': m,'data4': d})
+        # else:
+        #     return HttpResponse("請輸入合理值!")

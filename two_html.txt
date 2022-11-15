@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>TMDB電影預測</title>
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=**Noto+Sans+TC**&display=swap" rel="stylesheet">
+</head>
+  <style>
+  .jumbotron {
+    background-color: #00AF75 !important;
+  }
+
+  .container {
+    position: relative;
+    width: 70%;
+    font-family: 'Noto Sans TC', sans-serif;
+  }
+
+  .image {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .text {
+    color: white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    -ms-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-family: 'Noto Sans TC', sans-serif;
+
+  }
+
+  .topright {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+
+  }
+
+  @media (max-width:600px) {
+    .col-xs-12:hover .overlay {
+      opacity: 0.6;
+    }
+
+    .text {
+      font-size: 8vmin
+    }
+
+    .overlay img {
+      height: 20%;
+      width: 20%;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      width: 100%;
+      opacity: 0;
+      transition: .5s ease;
+      background-color: rgb(105, 105, 105);
+    }
+
+    .jumbotron {
+      margin-bottom:0px
+    }
+
+  }
+
+
+  @media (min-width:601px) {
+
+    .col-sm-3 {
+      padding: 0 4px;
+    }
+
+    .row {
+      width: 90%;
+      margin: 0 5%;
+    }
+
+    .col-sm-3:hover .overlay {
+      opacity: 0.6;
+    }
+
+    .overlay img {
+      height: 38px;
+      width: 38px;
+    }
+
+    .text {
+      font-size: 20px;
+    }
+
+    .col-sm-3 img {
+      margin-top: 8px;
+      vertical-align: middle;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 99%;
+      width: 98%;
+      opacity: 0;
+      transition: .5s ease;
+      background-color: rgb(105, 105, 105);
+
+    }
+  }
+
+  h1{
+      color: white;
+      font-size: 45px;
+      line-height: 1;
+      letter-spacing:2px;
+  }
+
+  h2{
+      color: red;
+      font-size: 38px;
+      line-height: 1;
+      letter-spacing:2px;
+  }
+
+  h3{
+      color: black;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing:2px;
+   }
+
+  h5{
+      color: black;
+      font-size: 23px;
+      line-height: 1;
+      letter-spacing:2px;
+  }
+    #overlay {
+        position: fixed;
+        background: rgba(0,0,0,0.8);
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+    }
+
+        .loader,
+        .loader:after {
+            border-radius: 50%;
+            width: 10em;
+            height: 10em;
+        }
+
+.loader {
+  color: #ffffff;
+  font-size: 20px;
+  margin: 100px auto;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  -webkit-animation: load4 1.3s infinite linear;
+  animation: load4 1.3s infinite linear;
+  -webkit-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+}
+@-webkit-keyframes load4 {
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em, 2em -2em 0 0em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em, 3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em, 2em -2em 0 0, 3em 0 0 0.2em, 2em 2em 0 0, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em, -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em, -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0, -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
+}
+@keyframes load4 {
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em, 2em -2em 0 0em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em, 3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em, 2em -2em 0 0, 3em 0 0 0.2em, 2em 2em 0 0, 0 3em 0 -1em, -2em 2em 0 -1em, -3em 0 0 -1em, -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em, -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em, -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0, -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em, 3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em, 3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em, -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
+}
+
+        #loadingDiv {
+            position:absolute;;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background-color:#00AF75;
+        }
+
+  </style>
+
+<body>
+	  <div class="jumbotron jumbotron-fluid">
+			<div class="container">
+      			<h1><strong>預測的票房為USD : {{data}} 元&nbsp➤ </strong><a href="https://tmdb-prediction.herokuapp.com/">重新預測</a></h1>
+                <br><h2><strong>Message: [ {{data3}} ]</strong></h2>
+                <p>&nbsp</p>
+				<h3><strong>➤ 根據您所選的&nbsp<u>{{data2}}</u>&nbsp類型，為您推薦以下電影...</strong></h3>
+                <p>&nbsp</p>
+				<h5><strong>➤ 圖片左上角可開啟電影首頁(沒有則不顯示)</strong></h5>
+			</div>
+	  </div>
+	  <div class="row">
+		  {{data4|safe}}
+<script>
+    $('body').append('<div style="" id="loadingDiv"><div class="loader">Loading...</div></div>');
+$(window).on('load', function(){
+  setTimeout(removeLoader, 1800);
+});
+function removeLoader(){
+    $( "#loadingDiv" ).fadeOut(500, function() {
+      // fadeOut complete. Remove the loading div
+      $( "#loadingDiv" ).remove();
+  });
+}
+</script>
+</body>
+</html>
